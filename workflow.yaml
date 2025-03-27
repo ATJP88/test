@@ -54,12 +54,14 @@ main:
     - process-batches:
         switch:
           - condition: ${currentIndex < totalEmployees}
-            next: process-current-batch
+            next: prepare-batch
           - next: log-batch-complete
 
-    - process-current-batch:
+    - prepare-batch:
         assign:
-          currentBatch: ${allEmployeeIds[currentIndex: (currentIndex + batchSize) > totalEmployees ? totalEmployees : (currentIndex + batchSize)]}
+          batchEnd: ${currentIndex + batchSize}
+          batchEnd: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
+          currentBatch: ${allEmployeeIds[currentIndex:batchEnd]}
 
     - log-current-batch:
         call: sys.log
@@ -69,7 +71,7 @@ main:
 
     - format-employee-ids:
         assign:
-          formattedEmployeeIds: ${join(',', currentBatch)}
+          formattedEmployeeIds: ${",".join(currentBatch)}
 
     - log-formatted-employee-ids:
         call: sys.log
