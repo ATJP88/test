@@ -54,20 +54,25 @@ main:
     - process-batches:
         switch:
           - condition: ${currentIndex < totalEmployees}
-            next: prepare-batch
+            next: calculate-batch-end
           - next: log-batch-complete
 
-    - prepare-batch:
+    - calculate-batch-end:
         assign:
           batchEnd: ${currentIndex + batchSize}
-          batchEnd: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
-          currentBatch: ${allEmployeeIds[currentIndex:batchEnd]}
+          batchEndFinal: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
+        next: prepare-batch
 
-    - log-current-batch:
-        call: sys.log
+    - prepare-batch:
+        call: sys.foreach
         args:
-          text: "Processing batch: ${currentBatch}"
-          severity: "DEBUG"
+          items: ${allEmployeeIds[currentIndex:batchEndFinal]}
+          variable: employeeId
+        steps:
+          - collect-batch:
+              assign:
+                currentBatch: ${currentBatch.append(employeeId)}
+        next: format-employee-ids
 
     - format-employee-ids:
         assign:
