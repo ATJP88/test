@@ -37,7 +37,6 @@ main:
           data: ${employeeIds.body}
           severity: "DEBUG"
 
-    # Initialize variables
     - set-variables:
         assign:
           - allEmployeeIds: ${employeeIds.body.employees}
@@ -51,14 +50,13 @@ main:
           text: "Total employees to process: ${totalEmployees}"
           severity: "INFO"
 
-    # Batch processing loop
+    # Process employees in batches of 10
     - process-batches:
         switch:
           - condition: ${currentIndex < totalEmployees}
             next: calculate-batch-end
         next: log-batch-complete
 
-    # Determine batch end
     - calculate-batch-end:
         assign:
           - batchEnd: ${currentIndex + batchSize}
@@ -71,64 +69,24 @@ main:
               - batchEnd: ${totalEmployees}
         next: prepare-batch
 
-    # Prepare batch processing
     - prepare-batch:
         assign:
           - currentBatch: []
 
     - collect-batch:
         for:
-          value: employeeId
-          in: ${allEmployeeIds}
-          index: index
+          value: index
+          range:
+            start: ${currentIndex}
+            end: ${batchEnd}
           steps:
-            - check-index:
-                switch:
-                  - condition: ${index >= currentIndex and index < batchEnd}
-                    steps:
-                      - append-employee:
-                          assign:
-                            - currentBatch: ${currentBatch + [employeeId]}
-        next: format-employee-ids
+            - append-employee:
+                assign:
+                  - currentBatch: ${currentBatch + [allEmployeeIds[index]]}
 
-    # Convert list to comma-separated string
     - format-employee-ids:
         assign:
           - formattedEmployeeIds: ${",".join(currentBatch)}
 
     - log-formatted-employee-ids:
-        call: sys.log
-        args:
-          text: "Formatted Employee IDs: ${formattedEmployeeIds}"
-          severity: "INFO"
-
-    # Call API with batched employee IDs
-    - process-employee-batch:
-        call: http.post
-        args:
-          url: https://emd-transformation-de-462434857315.europe-west1.run.app/emdDataFromBigQuery?insertDate=${date}&transactionalId=90810ca7-a33e-4bd8-98f9-334cd8ec1c6f&employees=${formattedEmployeeIds}
-          headers:
-            Content-Type: "application/json"
-          auth:
-            type: OIDC
-          body:
-            empDetails: ${employeeDetails.body.mappingData}
-        result: processResult
-
-    - log-process-result:
-        call: sys.log
-        args:
-          data: ${processResult}
-          severity: "DEBUG"
-
-    # Increment index for next batch
-    - increment-index:
-        assign:
-          - currentIndex: ${currentIndex + batchSize}
-        next: process-batches
-
-    - log-batch-complete:
-        call: sys.log
-        args:
-          text: "Batch processing completed."
-          severity: "INFO"
+        call: sys
