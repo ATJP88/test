@@ -37,6 +37,7 @@ main:
           data: ${employeeIds.body}
           severity: "DEBUG"
 
+    # Initialize variables
     - set-variables:
         assign:
           - allEmployeeIds: ${employeeIds.body.employees}
@@ -50,32 +51,47 @@ main:
           text: "Total employees to process: ${totalEmployees}"
           severity: "INFO"
 
-    # Process employees in batches of 10
+    # Batch processing loop
     - process-batches:
         switch:
           - condition: ${currentIndex < totalEmployees}
             next: calculate-batch-end
         next: log-batch-complete
 
+    # Determine batch end
     - calculate-batch-end:
         assign:
           - batchEnd: ${currentIndex + batchSize}
-          - batchEndFinal: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
+        next: check-batch-limit
+
+    - check-batch-limit:
+        switch:
+          - condition: ${batchEnd > totalEmployees}
+            assign:
+              - batchEnd: ${totalEmployees}
         next: prepare-batch
 
+    # Prepare batch processing
     - prepare-batch:
         assign:
           - currentBatch: []
-    
+
     - collect-batch:
         for:
           value: employeeId
-          in: ${allEmployeeIds[currentIndex:batchEndFinal]}
+          in: ${allEmployeeIds}
+          index: index
           steps:
-            - append-employee:
-                assign:
-                  - currentBatch: ${currentBatch + [employeeId]}
-    
+            - check-index:
+                switch:
+                  - condition: ${index >= currentIndex and index < batchEnd}
+                    steps:
+                      - append-employee:
+                          assign:
+                            - currentBatch: ${currentBatch + [employeeId]}
+        next: format-employee-ids
+
+    # Convert list to comma-separated string
     - format-employee-ids:
         assign:
           - formattedEmployeeIds: ${",".join(currentBatch)}
@@ -86,6 +102,7 @@ main:
           text: "Formatted Employee IDs: ${formattedEmployeeIds}"
           severity: "INFO"
 
+    # Call API with batched employee IDs
     - process-employee-batch:
         call: http.post
         args:
@@ -104,6 +121,7 @@ main:
           data: ${processResult}
           severity: "DEBUG"
 
+    # Increment index for next batch
     - increment-index:
         assign:
           - currentIndex: ${currentIndex + batchSize}
