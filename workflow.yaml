@@ -89,4 +89,36 @@ main:
           - formattedEmployeeIds: ${",".join(currentBatch)}
 
     - log-formatted-employee-ids:
-        call: sys
+        call: sys.log
+        args:
+          text: "Formatted Employee IDs: ${formattedEmployeeIds}"
+          severity: "INFO"
+
+    - process-employee-batch:
+        call: http.post
+        args:
+          url: https://emd-transformation-de-462434857315.europe-west1.run.app/emdDataFromBigQuery?insertDate=${date}&transactionalId=90810ca7-a33e-4bd8-98f9-334cd8ec1c6f&employees=${formattedEmployeeIds}
+          headers:
+            Content-Type: "application/json"
+          auth:
+            type: OIDC
+          body:
+            empDetails: ${employeeDetails.body.mappingData}
+        result: processResult
+
+    - log-process-result:
+        call: sys.log
+        args:
+          data: ${processResult}
+          severity: "DEBUG"
+
+    - increment-index:
+        assign:
+          - currentIndex: ${currentIndex + batchSize}
+        next: process-batches
+
+    - log-batch-complete:
+        call: sys.log
+        args:
+          text: "Batch processing completed."
+          severity: "INFO"
