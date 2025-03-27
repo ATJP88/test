@@ -39,10 +39,10 @@ main:
 
     - set-variables:
         assign:
-          allEmployeeIds: ${employeeIds.body.employees}
-          totalEmployees: ${len(employeeIds.body.employees)}
-          batchSize: 10
-          currentIndex: 0
+          - allEmployeeIds: ${employeeIds.body.employees}
+          - totalEmployees: ${len(employeeIds.body.employees)}
+          - batchSize: 10
+          - currentIndex: 0
 
     - log-total-employees:
         call: sys.log
@@ -55,28 +55,30 @@ main:
         switch:
           - condition: ${currentIndex < totalEmployees}
             next: calculate-batch-end
-          - next: log-batch-complete
+        next: log-batch-complete
 
     - calculate-batch-end:
         assign:
-          batchEnd: ${currentIndex + batchSize}
-          batchEndFinal: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
+          - batchEnd: ${currentIndex + batchSize}
+          - batchEndFinal: ${batchEnd if batchEnd <= totalEmployees else totalEmployees}
         next: prepare-batch
 
     - prepare-batch:
-        call: sys.foreach
-        args:
-          items: ${allEmployeeIds[currentIndex:batchEndFinal]}
-          variable: employeeId
-        steps:
-          - collect-batch:
-              assign:
-                currentBatch: ${currentBatch.append(employeeId)}
-        next: format-employee-ids
-
+        assign:
+          - currentBatch: []
+    
+    - collect-batch:
+        for:
+          value: employeeId
+          in: ${allEmployeeIds[currentIndex:batchEndFinal]}
+          steps:
+            - append-employee:
+                assign:
+                  - currentBatch: ${currentBatch + [employeeId]}
+    
     - format-employee-ids:
         assign:
-          formattedEmployeeIds: ${",".join(currentBatch)}
+          - formattedEmployeeIds: ${",".join(currentBatch)}
 
     - log-formatted-employee-ids:
         call: sys.log
@@ -104,7 +106,7 @@ main:
 
     - increment-index:
         assign:
-          currentIndex: ${currentIndex + batchSize}
+          - currentIndex: ${currentIndex + batchSize}
         next: process-batches
 
     - log-batch-complete:
